@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel de Lançamento — Avaner</title>
+<title>Alicerce Patrimonial — Avaner</title>
 <link rel="icon" href="assets/avaner-icon.png">
 <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -13,7 +13,7 @@
   <div class="inner">
     <img src="assets/avaner-icon.png" alt="Avaner" class="logo-icon">
     <div class="brandline">
-      <span class="eyebrow">Avaner · Coprodução Guilherme Assis</span>
+      <span class="eyebrow">Avaner · Alicerce Patrimonial</span>
       <h1>Painel de Lançamento</h1>
     </div>
     <div class="spacer"></div>
@@ -53,7 +53,7 @@
       <div class="section-head"><h2>Linha do tempo</h2><span class="hint">06/09 → 20/10</span></div>
       <div class="timeline">
         <div class="tl-track" id="tl-track"></div>
-        <div class="tl-labels"><span>06 set</span><span>20 out — live</span></div>
+        <div class="tl-labels"><span>06 set</span><span>27 out — fim</span></div>
       </div>
     </section>
 
@@ -126,6 +126,11 @@
   <div class="page" data-page="tasks" hidden>
     <section>
       <div class="section-head"><h2>Quadro de tarefas</h2><span class="hint">selecione uma fase</span></div>
+      <p class="foot-note" style="margin-top:0;margin-bottom:16px;">
+        <b>Como usar:</b> seu nome aparece automaticamente a partir do login — é o que fica registrado como "concluído por".
+        Use os botões de status (A fazer / Em andamento / Bloqueada / Concluída) em cada tarefa — marcar como Bloqueada
+        já avisa quem você precisa que resolva. Tudo aqui atualiza pra todo mundo, em tempo real.
+      </p>
       <div class="phase-tabs" id="phase-tabs"></div>
       <div class="filters" id="filters">
         <span class="flabel">Ver tarefas de</span>
@@ -135,16 +140,12 @@
         <button class="chip-filter" data-owner="Guilherme" aria-pressed="false">Guilherme</button>
       </div>
       <div class="phase-panel card" id="phase-panel"><div class="loading">Carregando tarefas…</div></div>
-      <p class="foot-note">
-        <b>Como usar:</b> seu nome aparece automaticamente a partir do login — é o que fica registrado como "concluído por".
-        As datas de cada tarefa foram distribuídas dentro do prazo até a live (20/10) a partir da lista de fases do Guilherme; ajuste direto marcando/desmarcando — tudo aqui atualiza pra todo mundo, em tempo real.
-      </p>
     </section>
   </div>
 
   <div class="page" data-page="creatives" hidden>
     <section>
-      <div class="section-head"><h2>Materiais criativos</h2><span class="hint">criativos, artes e vídeos do Guilherme — upload direto ou link</span></div>
+      <div class="section-head"><h2>Materiais</h2><span class="hint">copies, páginas, vídeos e criativos — upload direto, link do Drive/Frame.io, ou peça revisão de alguém</span></div>
       <div class="creative-grid" id="creatives"></div>
       <form class="creative-form" id="creative-form">
         <div class="field" style="min-width:200px;">
@@ -169,6 +170,10 @@
         <div class="field" id="creative-url-field" hidden>
           <label>Link</label>
           <input type="url" id="creative-url" placeholder="https://drive.google.com/…">
+        </div>
+        <div class="field">
+          <label>Pedir revisão de</label>
+          <select id="creative-reviewer"><option value="">Ninguém</option></select>
         </div>
         <button type="submit" class="btn-primary" id="creative-submit">Adicionar</button>
         <span class="upload-progress" id="creative-progress"></span>

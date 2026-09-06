@@ -195,11 +195,19 @@ window.AvanerTasks = (function () {
 
   // Linha do tempo — visual azul: fase concluída fica em azul sólido com
   // ✓, a fase atual pulsa/"escaneia", as futuras ficam em azul apagado.
+  // O período cobre até a última data de qualquer tarefa (a Fase 5 vai um
+  // pouco além da live) — evita cortar o segmento final. Se a barra passa
+  // da data da live, um marcador "live" aparece no meio dela.
   function renderTimeline(container, tasks) {
     const byPhase = {};
     tasks.forEach((t) => (byPhase[t.phase] = byPhase[t.phase] || []).push(t));
-    const totalSpan = liveDate - startDate;
     const current = getCurrentPhase(tasks);
+
+    const allDueDates = tasks.map((t) => t.dueDate).filter(Boolean).sort();
+    const lastDue = allDueDates.length ? new Date(allDueDates[allDueDates.length - 1] + 'T00:00:00') : liveDate;
+    const timelineEnd = lastDue > liveDate ? lastDue : liveDate;
+    const totalSpan = timelineEnd - startDate;
+
     let html = '';
     PHASE_ORDER.forEach((p) => {
       const arr = byPhase[p];
@@ -215,14 +223,27 @@ window.AvanerTasks = (function () {
       const label = p.replace(/^Fase \d: /, '');
       html += `<div class="tl-seg ${stateClass}" style="width:${widthPct}%" title="${label} — ${doneCount}/${arr.length}">${isDone ? '✓ ' : ''}${label}</div>`;
     });
-    container.innerHTML = html;
+    // os segmentos ficam num wrapper interno com as pontas arredondadas
+    // recortadas; os marcadores (hoje/live) ficam fora dele, senão o
+    // recorte corta o "pino" que sobe/desce acima da barra.
+    container.innerHTML = `<div class="tl-track-inner">${html}</div>`;
+
     const now = new Date();
-    const pct = Math.min(100, Math.max(0, ((now - startDate) / totalSpan) * 100));
+    const nowPct = Math.min(100, Math.max(0, ((now - startDate) / totalSpan) * 100));
     const marker = document.createElement('div');
     marker.className = 'tl-today';
-    marker.style.left = pct + '%';
+    marker.style.left = nowPct + '%';
     marker.innerHTML = '<span class="tl-today-dot"></span><span class="tl-today-label">hoje</span>';
     container.appendChild(marker);
+
+    if (timelineEnd > liveDate) {
+      const livePct = Math.min(100, Math.max(0, ((liveDate - startDate) / totalSpan) * 100));
+      const liveMarker = document.createElement('div');
+      liveMarker.className = 'tl-live';
+      liveMarker.style.left = livePct + '%';
+      liveMarker.innerHTML = '<span class="tl-live-label">live</span>';
+      container.appendChild(liveMarker);
+    }
   }
 
   function renderPerf(container, tasks) {

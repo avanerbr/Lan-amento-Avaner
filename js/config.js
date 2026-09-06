@@ -36,11 +36,19 @@ window.AVANER_CONFIG = {
   //    só 'michael', 'jamille' ou 'guilherme' (são as 3 únicas cores
   //    validadas para contraste e daltonismo sobre o azul-marinho da
   //    marca; qualquer outro valor cai numa cor cinza neutra).
-  //    Adicione as linhas da Jamille e do Guilherme aqui assim que criar
-  //    os usuários deles no Supabase, pra eles aparecerem na tela de
-  //    login também.
+  //
+  //    IMPORTANTE — pra Guilherme e Jamille aparecerem de verdade na tela
+  //    de login (e poderem usar o próprio usuário, com o próprio acesso),
+  //    o login de cada um PRECISA existir em Authentication → Users no seu
+  //    projeto Supabase, com o e-mail EXATAMENTE igual ao que está aqui
+  //    embaixo. Já deixei os dois prontos com os e-mails sugeridos no
+  //    README — se você criar com um e-mail diferente, só trocar aqui pra
+  //    bater. Enquanto o usuário não existir no Supabase, a pessoa aparece
+  //    na lista de login mas a senha não funciona.
   // -----------------------------------------------------------------------
   TEAM: [
     { email: 'avanerbr@gmail.com', name: 'Michael', role: 'Fundador', slot: 'michael' },
+    { email: 'guilherme@avaner.com.br', name: 'Guilherme', role: 'Coprodução', slot: 'guilherme' },
+    { email: 'jamille@avaner.com.br', name: 'Jamille', role: 'Customer Success', slot: 'jamille' },
   ],
 };

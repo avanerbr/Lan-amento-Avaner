@@ -254,6 +254,10 @@
   phaseSelect.innerHTML =
     '<option value="">Geral / sem fase</option>' + T.PHASE_ORDER.map((p) => `<option value="${p}">${p}</option>`).join('');
 
+  const reviewerSelect = document.getElementById('creative-reviewer');
+  reviewerSelect.innerHTML =
+    '<option value="">Ninguém</option>' + (cfg.TEAM || []).map((m) => `<option value="${m.name}">${m.name}</option>`).join('');
+
   let creativeKind = 'upload';
   document.querySelectorAll('.kind-toggle button').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -274,6 +278,7 @@
     e.preventDefault();
     const title = document.getElementById('creative-title').value.trim();
     const phase = phaseSelect.value;
+    const reviewer = reviewerSelect.value;
     const btn = document.getElementById('creative-submit');
     const progress = document.getElementById('creative-progress');
     if (!title) return;
@@ -294,6 +299,17 @@
           uploadedBy: member.name,
           onProgress: (msg) => (progress.textContent = msg),
         });
+      }
+      // Pedir revisão de alguém já cria o Pedido pra essa pessoa — mesma
+      // ideia da tarefa "Bloqueada": quem precisa agir já fica sabendo,
+      // sem precisar avisar por fora.
+      if (reviewer && reviewer !== member.name) {
+        try {
+          await R.add({ fromName: member.name, toName: reviewer, body: `Revisar material: "${title}"` });
+          await loadRequests();
+        } catch (reqErr) {
+          console.error('[Avaner] erro ao criar pedido de revisão', reqErr);
+        }
       }
       e.target.reset();
       progress.textContent = '';
