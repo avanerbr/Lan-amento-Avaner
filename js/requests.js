@@ -6,7 +6,11 @@
 
 window.AvanerRequests = (function () {
   async function fetchAll() {
-    const { data, error } = await window.supabaseClient.from('requests').select('*').order('created_at', { ascending: false }).limit(150);
+    const { data, error } = await window.supabaseClient
+      .from('requests')
+      .select('*, tasks(title)')
+      .order('created_at', { ascending: false })
+      .limit(150);
     if (error) {
       console.error('[Avaner] erro ao carregar pedidos', error);
       return [];
@@ -14,8 +18,12 @@ window.AvanerRequests = (function () {
     return data;
   }
 
-  async function add({ fromName, toName, body }) {
-    const { error } = await window.supabaseClient.from('requests').insert({ from_name: fromName, to_name: toName, body });
+  // taskId é opcional — fica preenchido quando o pedido nasceu de uma
+  // tarefa marcada como "Bloqueada" no quadro de tarefas.
+  async function add({ fromName, toName, body, taskId }) {
+    const { error } = await window.supabaseClient
+      .from('requests')
+      .insert({ from_name: fromName, to_name: toName, body, task_id: taskId || null });
     if (error) throw error;
   }
 
@@ -38,11 +46,13 @@ window.AvanerRequests = (function () {
 
     function card(r) {
       const chipBg = F.ownerChipBackground(r.to_name === 'Todos' ? 'Equipe' : r.to_name);
+      const linkedTitle = r.tasks && r.tasks.title ? r.tasks.title : null;
       return `<div class="request-item ${r.resolved ? 'resolved' : ''}" data-id="${r.id}">
         <div class="request-top">
           <div class="request-route"><b>${r.from_name}</b> → <span class="owner-chip" style="background:${chipBg}">${r.to_name}</span></div>
           <div class="note-time">${F.fmtRelativeTime(r.created_at)}</div>
         </div>
+        ${linkedTitle ? `<div class="request-task-tag">🔗 tarefa: ${linkedTitle}</div>` : ''}
         <div class="note-body">${r.body.replace(/</g, '&lt;')}</div>
         ${!r.resolved ? '<div class="creative-actions" style="margin-top:8px;"><button type="button" class="btn-resolve" data-action="resolve">Concluir</button></div>' : `<div class="request-resolved-tag">✓ concluído${r.resolved_by ? ' por ' + r.resolved_by : ''}</div>`}
       </div>`;

@@ -39,8 +39,10 @@ Se algo der erro de "already exists" ao rodar de novo, pode ignorar — os
 dois arquivos foram feitos pra serem seguros de rodar mais de uma vez.
 
 **Se você já tinha rodado uma versão anterior do `schema.sql`:** rode o
-`schema.sql` novo de novo — ele só adiciona a tabela `requests` (pedidos)
-que não existia antes; nada do que já estava lá é apagado ou recriado.
+`schema.sql` novo de novo — ele só adiciona o que ainda não existe (a
+tabela `requests`, e agora também as colunas de status/prioridade das
+tarefas e o vínculo pedido↔tarefa); nada do que já estava lá é apagado ou
+recriado.
 
 ## 3. Criar os 3 usuários do time
 
@@ -120,24 +122,44 @@ automaticamente quem é quem (nome, cor, cargo) a partir do login.
 
 O painel é dividido em 4 páginas, acessíveis pelas abas do topo:
 
-- **Visão Geral**: metas de faturamento e grupo, desempenho por pessoa,
-  gráficos de evolução, preocupações (incluindo o critério de "pronto pra
-  começar os anúncios" — ver abaixo) e a linha do tempo.
+- **Visão Geral**: no topo, um cartão pessoal ("Minhas pendências") mostra
+  suas tarefas atrasadas/bloqueadas e pedidos esperando por você. Logo
+  abaixo, a linha do tempo (ver abaixo). Depois vêm metas de faturamento e
+  grupo, um feed de "Atividade recente" (o que o time andou fazendo,
+  juntando tarefas/criativos/notas/pedidos num só lugar), desempenho por
+  pessoa, gráficos de evolução e preocupações (incluindo o critério de
+  "pronto pra começar os anúncios").
 - **Tarefas**: as 5 fases do checklist do Guilherme em abas — clique numa
-  fase pra ver só as tarefas dela. Marcar uma tarefa atualiza a barra de
-  progresso na hora (antes mesmo de confirmar no banco) e registra
-  automaticamente quem concluiu. No topo da fase "Campanhas" aparece o
-  aviso de pronto/não-pronto pra subir os anúncios.
+  fase pra ver só as tarefas dela. Cada tarefa tem 4 status: **A fazer**,
+  **Em andamento**, **Bloqueada** e **Concluída** — clique no botão
+  correspondente pra mudar (aparece na hora, antes mesmo de confirmar no
+  banco). Marcar como **Bloqueada** abre um miniformulário pra dizer de
+  quem você precisa e o quê — isso cria automaticamente um Pedido pra
+  aquela pessoa, já linkado na tarefa (aparece com "🔗 tarefa: …" na aba
+  Pedidos). O ícone 🔥 ao lado do título marca uma tarefa como urgente. No
+  topo da fase "Campanhas" aparece o aviso de pronto/não-pronto pra subir
+  os anúncios.
 - **Criativos**: o Guilherme sobe arquivo direto (fica guardado no
   Supabase Storage) ou cola um link (Drive, Frame.io, etc.) — os dois
   aparecem juntos, filtráveis por fase.
 - **Pedidos**: qualquer um pede algo de alguém específico (ou de "Todos")
   — aparece um contador no cabeçalho de quantos pedidos estão esperando a
-  pessoa logada, e um "Concluir" quando resolvido. É o "sistema aponta o
-  que eu preciso fazer" — mais direto que deixar tudo solto nas
-  observações.
+  pessoa logada, e um "Concluir" quando resolvido. Pedidos criados a
+  partir de uma tarefa bloqueada aparecem com o nome da tarefa junto. É o
+  "sistema aponta o que eu preciso fazer" — mais direto que deixar tudo
+  solto nas observações.
 - **Observações** (dentro da página Pedidos): mural simples de notas
   sobre o andamento geral — cada um só apaga as próprias.
+
+## Linha do tempo
+
+Fica logo no topo da Visão Geral agora. O visual é todo em tons de azul,
+mais "vivo": a fase já concluída aparece em azul sólido com um ✓, a fase
+em que vocês estão agora pulsa com um brilho passando por cima (pra
+chamar o olho pra onde a atenção deveria estar), e as fases futuras ficam
+esmaecidas. O marcador "hoje" continua em verde, com um efeito de "ping"
+(círculo pulsando), pra ficar fácil de achar onde estamos na régua do
+tempo mesmo de relance.
 
 ## Critério para começar os anúncios
 

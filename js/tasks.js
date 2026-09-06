@@ -1,5 +1,6 @@
 // =========================================================================
-// Quadro de tarefas — fases em abas, desempenho por pessoa, preocupações
+// Quadro de tarefas — fases em abas, status (A fazer/Em andamento/
+// Bloqueada/Concluída), prioridade, desempenho por pessoa, preocupações
 // (incluindo o critério de "pronto para anúncios"), timeline.
 // =========================================================================
 
@@ -21,10 +22,18 @@ window.AvanerTasks = (function () {
     'Fase 2: Campanhas': 'Fase 1: Alicerce',
   };
 
+  const STATUS_META = {
+    todo: { icon: '○', label: 'A fazer' },
+    doing: { icon: '◐', label: 'Em andamento' },
+    blocked: { icon: '⛔', label: 'Bloqueada' },
+    done: { icon: '✓', label: 'Concluída' },
+  };
+
   let allTasks = [];
   let ownerFilter = 'Todos';
   let activePhase = null;
   let currentMember = null;
+  let teamList = [];
   let startDate, liveDate;
 
   function rowToTask(r) {
@@ -38,6 +47,9 @@ window.AvanerTasks = (function () {
       order: r.sort_order,
       done: r.done,
       doneBy: r.done_by,
+      status: r.status || (r.done ? 'done' : 'todo'),
+      priority: r.priority || 'normal',
+      updatedAt: r.updated_at,
     };
   }
 
@@ -50,25 +62,41 @@ window.AvanerTasks = (function () {
     return data.map(rowToTask);
   }
 
-  // Muda o estado local na hora (otimista) — quem chamou é responsável por
-  // re-renderizar a UI logo em seguida, antes mesmo da gravação no banco
-  // confirmar, pra parecer instantâneo.
-  function toggleLocal(tasks, id, checked) {
+  // ---- status (otimista: quem chamou re-renderiza antes da gravação
+  // confirmar, pra parecer instantâneo) -----------------------------------
+  function setStatusLocal(tasks, id, status) {
     const t = tasks.find((x) => x.id === id);
     if (t) {
-      t.done = checked;
-      t.doneBy = checked ? (currentMember ? currentMember.name : 'Alguém') : null;
+      t.status = status;
+      t.done = status === 'done';
+      t.doneBy = status === 'done' ? (currentMember ? currentMember.name : 'Alguém') : null;
+      t.updatedAt = new Date().toISOString();
     }
     return tasks;
   }
 
-  async function persistToggle(id, checked) {
-    const doneBy = checked ? (currentMember ? currentMember.name : 'Alguém') : null;
+  async function persistStatus(id, status) {
+    const doneBy = status === 'done' ? (currentMember ? currentMember.name : 'Alguém') : null;
     const { error } = await window.supabaseClient
       .from('tasks')
-      .update({ done: checked, done_by: doneBy, updated_at: new Date().toISOString() })
+      .update({ status, done: status === 'done', done_by: doneBy, updated_at: new Date().toISOString() })
       .eq('id', id);
-    if (error) console.error('[Avaner] erro ao atualizar tarefa', error);
+    if (error) console.error('[Avaner] erro ao atualizar status da tarefa', error);
+    return !error;
+  }
+
+  function setPriorityLocal(tasks, id, priority) {
+    const t = tasks.find((x) => x.id === id);
+    if (t) t.priority = priority;
+    return tasks;
+  }
+
+  async function persistPriority(id, priority) {
+    const { error } = await window.supabaseClient
+      .from('tasks')
+      .update({ priority, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) console.error('[Avaner] erro ao atualizar prioridade da tarefa', error);
     return !error;
   }
 
@@ -93,6 +121,16 @@ window.AvanerTasks = (function () {
     const total = gateTasks.length;
     const missing = gateTasks.filter((t) => !t.done).map((t) => t.title);
     return { ready: total > 0 && done === total, done, total, missing, gatePhase };
+  }
+
+  // Tarefas atrasadas/bloqueadas/pra hoje de uma pessoa específica —
+  // alimenta o widget "Minhas pendências" na Visão Geral.
+  function getPendingFor(tasks, personName) {
+    const mine = tasks.filter((t) => F.taskInvolves(t, personName));
+    const overdue = mine.filter((t) => t.status !== 'done' && F.dueState(t.dueDate, t.done) === 'overdue');
+    const dueSoon = mine.filter((t) => t.status !== 'done' && F.dueState(t.dueDate, t.done) === 'soon');
+    const blocked = mine.filter((t) => t.status === 'blocked');
+    return { overdue, dueSoon, blocked };
   }
 
   function computeRisks(tasks) {
@@ -155,20 +193,27 @@ window.AvanerTasks = (function () {
       .join('');
   }
 
+  // Linha do tempo — visual azul: fase concluída fica em azul sólido com
+  // ✓, a fase atual pulsa/"escaneia", as futuras ficam em azul apagado.
   function renderTimeline(container, tasks) {
     const byPhase = {};
     tasks.forEach((t) => (byPhase[t.phase] = byPhase[t.phase] || []).push(t));
     const totalSpan = liveDate - startDate;
-    const segColors = ['var(--areia)', 'var(--p-guilherme)', 'var(--p-jamille)', 'var(--p-michael)', 'var(--p-team)'];
+    const current = getCurrentPhase(tasks);
     let html = '';
-    PHASE_ORDER.forEach((p, i) => {
+    PHASE_ORDER.forEach((p) => {
       const arr = byPhase[p];
       if (!arr || !arr.length) return;
       const dates = arr.map((t) => t.dueDate).sort();
       const start = new Date(dates[0] + 'T00:00:00');
       const end = new Date(dates[dates.length - 1] + 'T00:00:00');
       const widthPct = Math.max(4, ((end - start) / totalSpan) * 100);
-      html += `<div class="tl-seg" style="width:${widthPct}%;background:${segColors[i % segColors.length]}" title="${p}">${p.replace('Fase ' + (i + 1) + ': ', '')}</div>`;
+      const doneCount = arr.filter((t) => t.status === 'done').length;
+      const isDone = doneCount === arr.length;
+      const isCurrent = p === current && !isDone;
+      const stateClass = isDone ? 'tl-done' : isCurrent ? 'tl-current' : 'tl-upcoming';
+      const label = p.replace(/^Fase \d: /, '');
+      html += `<div class="tl-seg ${stateClass}" style="width:${widthPct}%" title="${label} — ${doneCount}/${arr.length}">${isDone ? '✓ ' : ''}${label}</div>`;
     });
     container.innerHTML = html;
     const now = new Date();
@@ -176,6 +221,7 @@ window.AvanerTasks = (function () {
     const marker = document.createElement('div');
     marker.className = 'tl-today';
     marker.style.left = pct + '%';
+    marker.innerHTML = '<span class="tl-today-dot"></span><span class="tl-today-label">hoje</span>';
     container.appendChild(marker);
   }
 
@@ -251,7 +297,7 @@ window.AvanerTasks = (function () {
     });
   }
 
-  function renderPhasePanel(container, tasks, onToggle) {
+  function renderPhasePanel(container, tasks, onStatusChange, onPriorityChange) {
     if (!activePhase) activePhase = getCurrentPhase(tasks);
     const arr = tasks.filter((t) => t.phase === activePhase).sort((a, b) => a.dueDate.localeCompare(b.dueDate) || (a.order || 0) - (b.order || 0));
     const visible = ownerFilter === 'Todos' ? arr : arr.filter((t) => F.taskInvolves(t, ownerFilter));
@@ -260,6 +306,7 @@ window.AvanerTasks = (function () {
     const range = arr.length ? F.fmtDate(dates[0]) + '–' + F.fmtDate(dates[dates.length - 1]) : '';
 
     const readiness = READINESS_GATES[activePhase] ? computeAdsReadiness(tasks) : null;
+    const toOptions = teamList.map((m) => `<option value="${m.name}">${m.name}</option>`).join('') + '<option value="Todos">Todos</option>';
 
     container.innerHTML = `
       <div class="phase-panel-head">
@@ -287,15 +334,31 @@ window.AvanerTasks = (function () {
                 .map((t) => {
                   const state = F.dueState(t.dueDate, t.done);
                   const chipBg = F.ownerChipBackground(t.owner);
-                  return `<div class="task ${t.done ? 'done' : ''}">
-              <input type="checkbox" class="cb" data-id="${t.id}" ${t.done ? 'checked' : ''}>
+                  const sMeta = STATUS_META[t.status] || STATUS_META.todo;
+                  return `<div class="task ${t.status} ${t.priority === 'urgente' ? 'urgente' : ''}" data-id="${t.id}">
+              <div class="status-group" data-id="${t.id}">
+                <button type="button" class="status-btn s-todo" data-status="todo" aria-pressed="${t.status === 'todo'}" title="A fazer">○</button>
+                <button type="button" class="status-btn s-doing" data-status="doing" aria-pressed="${t.status === 'doing'}" title="Em andamento">◐</button>
+                <button type="button" class="status-btn s-blocked" data-status="blocked" aria-pressed="${t.status === 'blocked'}" title="Bloqueada">⛔</button>
+                <button type="button" class="status-btn s-done" data-status="done" aria-pressed="${t.status === 'done'}" title="Concluída">✓</button>
+              </div>
               <div class="task-body">
-                <div class="task-title">${t.title}</div>
+                <div class="task-title-row">
+                  <div class="task-title">${t.title}</div>
+                  <button type="button" class="priority-btn ${t.priority === 'urgente' ? 'active' : ''}" data-id="${t.id}" title="Marcar/desmarcar como urgente">🔥</button>
+                </div>
                 ${t.detail ? `<div class="task-detail">${t.detail}</div>` : ''}
                 <div class="task-meta">
                   <span class="owner-chip" style="background:${chipBg}">${t.owner}</span>
+                  <span class="status-pill ${t.status}">${sMeta.label}</span>
                   <span class="due-pill ${state === 'overdue' ? 'overdue' : state === 'soon' ? 'soon' : ''}">${state === 'overdue' ? 'atrasado · ' : ''}${F.fmtDate(t.dueDate)}</span>
                   ${t.done && t.doneBy ? `<span class="doneby">✓ ${t.doneBy}</span>` : ''}
+                </div>
+                <div class="block-form" data-id="${t.id}" hidden>
+                  <select class="block-to">${toOptions}</select>
+                  <input type="text" class="block-note" placeholder="O que falta / de quem depende?">
+                  <button type="button" class="block-submit">Registrar e pedir</button>
+                  <button type="button" class="block-cancel">Cancelar</button>
                 </div>
               </div>
             </div>`;
@@ -305,11 +368,50 @@ window.AvanerTasks = (function () {
         }
       </div>`;
 
-    container.querySelectorAll('.cb').forEach((cb) => {
-      cb.addEventListener('change', () => {
-        const row = cb.closest('.task');
-        row.classList.add('pulse');
-        onToggle(cb.dataset.id, cb.checked);
+    container.querySelectorAll('.status-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const group = btn.closest('.status-group');
+        const id = group.dataset.id;
+        const status = btn.dataset.status;
+        const row = btn.closest('.task');
+        if (status === 'blocked') {
+          const form = row.querySelector('.block-form');
+          if (form) form.hidden = !form.hidden;
+          return;
+        }
+        if (row) row.classList.add('pulse');
+        onStatusChange(id, status);
+      });
+    });
+
+    container.querySelectorAll('.priority-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const next = btn.classList.contains('active') ? 'normal' : 'urgente';
+        onPriorityChange(id, next);
+      });
+    });
+
+    container.querySelectorAll('.block-submit').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const form = btn.closest('.block-form');
+        const id = form.dataset.id;
+        const toName = form.querySelector('.block-to').value;
+        const note = form.querySelector('.block-note').value.trim();
+        if (!note) {
+          form.querySelector('.block-note').focus();
+          return;
+        }
+        form.hidden = true;
+        const row = form.closest('.task');
+        if (row) row.classList.add('pulse');
+        onStatusChange(id, 'blocked', { toName, note });
+      });
+    });
+
+    container.querySelectorAll('.block-cancel').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        btn.closest('.block-form').hidden = true;
       });
     });
   }
@@ -318,13 +420,17 @@ window.AvanerTasks = (function () {
     currentMember = opts.member;
     startDate = opts.startDate;
     liveDate = opts.liveDate;
+    teamList = opts.team || [];
   }
 
   return {
     PHASE_ORDER,
+    STATUS_META,
     fetchAll,
-    toggleLocal,
-    persistToggle,
+    setStatusLocal,
+    persistStatus,
+    setPriorityLocal,
+    persistPriority,
     renderPhaseTabs,
     renderPhasePanel,
     renderPerf,
@@ -332,6 +438,7 @@ window.AvanerTasks = (function () {
     renderTimeline,
     getCurrentPhase,
     computeAdsReadiness,
+    getPendingFor,
     setOwnerFilter,
     getOwnerFilter,
     setActivePhase,

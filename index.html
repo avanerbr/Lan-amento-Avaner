@@ -46,6 +46,18 @@
   <div class="page" data-page="overview">
 
     <section>
+      <div class="mp-card" id="my-pending"><div class="loading">Carregando…</div></div>
+    </section>
+
+    <section>
+      <div class="section-head"><h2>Linha do tempo</h2><span class="hint">06/09 → 20/10</span></div>
+      <div class="timeline">
+        <div class="tl-track" id="tl-track"></div>
+        <div class="tl-labels"><span>06 set</span><span>20 out — live</span></div>
+      </div>
+    </section>
+
+    <section>
       <div class="section-head"><h2>Meta do lançamento</h2><span class="hint">atualizado em tempo real por qualquer um do time</span></div>
       <div class="goals">
         <div class="tile" style="--tile-accent:var(--p-michael)">
@@ -76,6 +88,11 @@
     </section>
 
     <section>
+      <div class="section-head"><h2>Atividade recente</h2><span class="hint">o que o time andou fazendo</span></div>
+      <div class="activity-feed" id="activity-feed"><div class="loading">Carregando…</div></div>
+    </section>
+
+    <section>
       <div class="section-head"><h2>Desempenho por pessoa</h2><span class="hint">% de tarefas concluídas do que está sob responsabilidade de cada um</span></div>
       <div class="perf-grid" id="perf"></div>
     </section>
@@ -101,14 +118,6 @@
       <div class="risk-grid" id="risks"></div>
       <div class="note-card">
         <b>Duas notas estratégicas fixas:</b> a verba de tráfego desse ciclo (R$5.000 para ~4 semanas) é enxuta pra meta de R$1-3MM — o grupo provavelmente vai crescer mais por conteúdo orgânico e base própria do que por anúncio pago, então vale acompanhar o custo por lead nas primeiras campanhas antes de prometer os 200. E o VSL da Página de Vendas (Fase 4) é o ponto certo pra fazer a quebra de objeção — filtrar quem não tem perfil antes da oferta, não só vender.
-      </div>
-    </section>
-
-    <section>
-      <div class="section-head"><h2>Linha do tempo</h2><span class="hint">06/09 → 20/10</span></div>
-      <div class="timeline">
-        <div class="tl-track" id="tl-track"></div>
-        <div class="tl-labels"><span>06 set</span><span>20 out — live</span></div>
       </div>
     </section>
 
@@ -211,6 +220,7 @@
 <script src="js/creatives.js"></script>
 <script src="js/notes.js"></script>
 <script src="js/requests.js"></script>
+<script src="js/activity.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

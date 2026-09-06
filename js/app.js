@@ -1,6 +1,7 @@
 // =========================================================================
 // app.js — bootstrap do painel. Amarra os módulos (tasks, metrics,
-// creatives, notes, requests, charts) à página e ao Supabase Realtime.
+// creatives, notes, requests, activity, charts) à página e ao Supabase
+// Realtime.
 // =========================================================================
 
 (async function () {
@@ -11,6 +12,7 @@
   const C = window.AvanerCreatives;
   const N = window.AvanerNotes;
   const R = window.AvanerRequests;
+  const Activity = window.AvanerActivity;
   const Charts = window.AvanerCharts;
 
   const member = await window.requireSession();
@@ -19,7 +21,13 @@
   const START_DATE = new Date(cfg.START_DATE);
   const LIVE_DATE = new Date(cfg.LIVE_DATE);
 
-  T.init({ member, startDate: START_DATE, liveDate: LIVE_DATE });
+  T.init({ member, startDate: START_DATE, liveDate: LIVE_DATE, team: cfg.TEAM });
+
+  // guardamos os últimos dados carregados de cada seção pra poder montar
+  // o feed de atividade e o widget "minhas pendências" sem refazer fetch.
+  let lastCreatives = [];
+  let lastNotes = [];
+  let lastRequestsData = [];
 
   // ---- header -----------------------------------------------------------
   document.getElementById('user-dot').style.background = F.slotColorVar(member.slot);
@@ -70,7 +78,7 @@
   });
 
   function renderPhasePanel() {
-    T.renderPhasePanel(document.getElementById('phase-panel'), T.all, onToggleTask);
+    T.renderPhasePanel(document.getElementById('phase-panel'), T.all, onChangeStatus, onChangePriority);
   }
 
   function renderPhaseTabsAndPanel(tasks) {
@@ -80,18 +88,83 @@
     renderPhasePanel();
   }
 
-  // Marcar/desmarcar aparece na hora (otimista): muda o estado local e
-  // re-renderiza tudo antes mesmo da resposta do banco voltar.
-  async function onToggleTask(id, checked) {
-    T.toggleLocal(T.all, id, checked);
+  // Mudar status aparece na hora (otimista): muda o estado local e
+  // re-renderiza tudo antes mesmo da resposta do banco voltar. Quando a
+  // tarefa vira "Bloqueada" com uma nota, isso também cria um Pedido
+  // automaticamente pra pessoa escolhida, já linkado a essa tarefa.
+  async function onChangeStatus(id, status, extra) {
+    const prevStatus = (T.all.find((t) => t.id === id) || {}).status;
+    T.setStatusLocal(T.all, id, status);
     renderTasksUI(T.all);
-    const ok = await T.persistToggle(id, checked);
+    const ok = await T.persistStatus(id, status);
     if (!ok) {
-      // reverte se a gravação falhar
-      T.toggleLocal(T.all, id, !checked);
+      T.setStatusLocal(T.all, id, prevStatus);
+      renderTasksUI(T.all);
+      alert('Não foi possível salvar — tente de novo.');
+      return;
+    }
+    if (status === 'blocked' && extra && extra.note) {
+      try {
+        const task = T.all.find((t) => t.id === id);
+        await R.add({
+          fromName: member.name,
+          toName: extra.toName,
+          body: `Bloqueio em "${task ? task.title : id}": ${extra.note}`,
+          taskId: id,
+        });
+        await loadRequests();
+      } catch (err) {
+        console.error('[Avaner] erro ao criar pedido do bloqueio', err);
+      }
+    }
+  }
+
+  async function onChangePriority(id, priority) {
+    const prev = priority === 'urgente' ? 'normal' : 'urgente';
+    T.setPriorityLocal(T.all, id, priority);
+    renderTasksUI(T.all);
+    const ok = await T.persistPriority(id, priority);
+    if (!ok) {
+      T.setPriorityLocal(T.all, id, prev);
       renderTasksUI(T.all);
       alert('Não foi possível salvar — tente de novo.');
     }
+  }
+
+  // ---- widget pessoal "Minhas pendências" --------------------------------
+  function renderMyPending() {
+    const el = document.getElementById('my-pending');
+    if (!el) return;
+    const { overdue, dueSoon, blocked } = T.getPendingFor(T.all, member.name);
+    const openReqs = lastRequestsData.filter((r) => !r.resolved && (r.to_name === member.name || r.to_name === 'Todos'));
+
+    const items = [];
+    overdue.forEach((t) => items.push({ tag: 'atrasada', cls: 'crit', text: t.title }));
+    blocked.forEach((t) => items.push({ tag: 'bloqueada', cls: 'warn', text: t.title }));
+    dueSoon.forEach((t) => items.push({ tag: 'pra breve', cls: 'soon', text: t.title }));
+
+    el.innerHTML = `
+      <div class="mp-stats">
+        <div class="mp-stat"><span class="n">${overdue.length}</span><span class="l">atrasadas</span></div>
+        <div class="mp-stat"><span class="n">${blocked.length}</span><span class="l">bloqueadas</span></div>
+        <div class="mp-stat"><span class="n">${openReqs.length}</span><span class="l">pedidos p/ você</span></div>
+      </div>
+      ${
+        items.length
+          ? `<ul class="mp-list">${items
+              .slice(0, 5)
+              .map((i) => `<li><span class="mp-tag ${i.cls}">${i.tag}</span>${i.text}</li>`)
+              .join('')}</ul>`
+          : `<div class="note-empty" style="padding:6px 0;">Tudo em dia por aqui, ${member.name}.</div>`
+      }
+    `;
+  }
+
+  function renderActivity() {
+    const el = document.getElementById('activity-feed');
+    if (!el) return;
+    const events = Activity.build({ tasks: T.all, creatives: lastCreatives, notes: lastNotes, requests: lastRequestsData });
+    Activity.render(el, events);
   }
 
   // ---- render geral a partir das tarefas ---------------------------------
@@ -108,6 +181,8 @@
     T.renderRisks(document.getElementById('risks'), tasks);
     T.renderTimeline(document.getElementById('tl-track'), tasks);
     renderPhaseTabsAndPanel(tasks);
+    renderMyPending();
+    renderActivity();
   }
 
   async function loadTasks() {
@@ -190,7 +265,9 @@
   });
 
   async function loadCreatives() {
-    C.render(document.getElementById('creatives'), await C.fetchAll());
+    lastCreatives = await C.fetchAll();
+    C.render(document.getElementById('creatives'), lastCreatives);
+    renderActivity();
   }
 
   document.getElementById('creative-form').addEventListener('submit', async (e) => {
@@ -230,7 +307,9 @@
 
   // ---- observações ----------------------------------------------------------
   async function loadNotes() {
-    N.render(document.getElementById('notes'), await N.fetchAll(), member.name);
+    lastNotes = await N.fetchAll();
+    N.render(document.getElementById('notes'), lastNotes, member.name);
+    renderActivity();
   }
 
   document.getElementById('note-form').addEventListener('submit', async (e) => {
@@ -258,6 +337,7 @@
 
   async function loadRequests() {
     const items = await R.fetchAll();
+    lastRequestsData = items;
     R.render(document.getElementById('requests-open'), document.getElementById('requests-done'), items, member.name);
 
     const openForMe = R.countOpenFor(items, member.name);
@@ -267,6 +347,9 @@
     badge.textContent = openForMe;
     badgeInline.hidden = openForMe === 0;
     badgeInline.textContent = openForMe;
+
+    renderMyPending();
+    renderActivity();
   }
 
   document.getElementById('request-form').addEventListener('submit', async (e) => {

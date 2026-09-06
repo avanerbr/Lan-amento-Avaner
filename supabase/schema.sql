@@ -4,6 +4,10 @@
 -- (Supabase → SQL Editor → New query → cole tudo → Run).
 -- É seguro rodar mais de uma vez: todos os comandos são "idempotentes"
 -- (usam IF NOT EXISTS / ON CONFLICT / blocos que ignoram erro de duplicado).
+-- Se você já tinha rodado uma versão anterior deste arquivo, pode rodar
+-- essa versão nova de novo sem medo — ela só ADICIONA o que falta (status,
+-- prioridade das tarefas, e o vínculo de pedido↔tarefa); nada do que já
+-- existe é apagado ou recriado.
 -- =========================================================================
 
 create extension if not exists pgcrypto;
@@ -23,6 +27,8 @@ create table if not exists public.tasks (
   sort_order  integer not null default 0,
   done        boolean not null default false,
   done_by     text,
+  status      text not null default 'todo' check (status in ('todo', 'doing', 'blocked', 'done')),
+  priority    text not null default 'normal' check (priority in ('normal', 'urgente')),
   updated_at  timestamptz not null default now()
 );
 
@@ -65,17 +71,43 @@ create table if not exists public.notes (
   created_at  timestamptz not null default now()
 );
 
--- Pedidos — um pede algo pro outro e o sistema aponta pra quem precisa agir
+-- Pedidos — um pede algo pro outro e o sistema aponta pra quem precisa agir.
+-- task_id é opcional: fica preenchido quando o pedido nasceu automaticamente
+-- de uma tarefa marcada como "Bloqueada" (ver js/tasks.js).
 create table if not exists public.requests (
   id           uuid primary key default gen_random_uuid(),
   from_name    text not null,
   to_name      text not null,        -- nome de uma pessoa do TEAM, ou 'Todos'
   body         text not null,
+  task_id      text references public.tasks(id) on delete set null,
   resolved     boolean not null default false,
   resolved_by  text,
   created_at   timestamptz not null default now(),
   resolved_at  timestamptz
 );
+
+-- -------------------------------------------------------------------------
+-- 1.1 MIGRAÇÃO — só faz algo se você já tinha uma versão anterior instalada
+-- (sem status/prioridade/vínculo de pedido↔tarefa). Em instalação nova,
+-- esses comandos não fazem nada (as colunas já nasceram acima).
+-- -------------------------------------------------------------------------
+
+alter table public.tasks add column if not exists status text not null default 'todo';
+alter table public.tasks add column if not exists priority text not null default 'normal';
+
+do $$ begin
+  alter table public.tasks add constraint tasks_status_check check (status in ('todo', 'doing', 'blocked', 'done'));
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  alter table public.tasks add constraint tasks_priority_check check (priority in ('normal', 'urgente'));
+exception when duplicate_object then null; end $$;
+
+-- Preenche o status pra quem já tinha tarefas marcadas como feitas antes
+-- dessa coluna existir (não mexe em quem já estiver 'doing'/'blocked').
+update public.tasks set status = 'done' where done = true and status = 'todo';
+
+alter table public.requests add column if not exists task_id text references public.tasks(id) on delete set null;
 
 -- -------------------------------------------------------------------------
 -- 2. ROW LEVEL SECURITY
