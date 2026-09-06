@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Entrar — Painel de Lançamento Avaner</title>
+<link rel="icon" href="assets/avaner-icon.png">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="login-screen">
+  <div class="login-card">
+    <img src="assets/avaner-icon.png" alt="Avaner">
+    <h1>Painel de Lançamento</h1>
+    <div class="tagline">Consórcio HS · Coprodução Guilherme Assis</div>
+
+    <form id="login-form">
+      <div>
+        <label for="login-email">E-mail</label>
+        <input type="email" id="login-email" required autocomplete="username" placeholder="seu@avaner.com.br">
+      </div>
+      <div>
+        <label for="login-password">Senha</label>
+        <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••">
+      </div>
+      <div class="login-error" id="login-error" hidden></div>
+      <button type="submit" id="login-submit">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/auth.js"></script>
+<script>window.setupLoginForm();</script>
+</body>
+</html>

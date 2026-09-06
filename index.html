@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel de Lançamento — Avaner</title>
+<link rel="icon" href="assets/avaner-icon.png">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="inner">
+    <img src="assets/avaner-icon.png" alt="Avaner" class="logo-icon">
+    <div class="brandline">
+      <span class="eyebrow">Avaner · Consórcio HS · Coprodução Guilherme Assis</span>
+      <h1>Painel de Lançamento</h1>
+    </div>
+    <div class="spacer"></div>
+    <div class="countdown">
+      <div class="n" id="countdown-n">—</div>
+      <div class="l">dias para a live</div>
+      <div class="d" id="countdown-platform">—</div>
+    </div>
+    <div class="user-badge">
+      <span class="dot" id="user-dot"></span>
+      <div>
+        <div class="name" id="user-name">—</div>
+        <div class="role" id="user-role"></div>
+      </div>
+      <button id="logout-btn" type="button">Sair</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section>
+    <div class="section-head"><h2>Meta do lançamento</h2><span class="hint">atualizado em tempo real por qualquer um do time</span></div>
+    <div class="goals">
+      <div class="tile" style="--tile-accent:var(--p-michael)">
+        <div class="k">Faturamento</div>
+        <input id="revenue" type="number" min="0" step="1000" value="0">
+        <div class="sub" id="revenue-sub">—</div>
+        <div class="bar-track"><div class="bar-fill" id="revenue-bar" style="background:var(--p-michael)"></div></div>
+      </div>
+      <div class="tile" style="--tile-accent:var(--p-guilherme)">
+        <div class="k">Pessoas no grupo</div>
+        <input id="group-count" type="number" min="0" value="0">
+        <div class="sub" id="group-sub">—</div>
+        <div class="bar-track"><div class="bar-fill" id="group-bar" style="background:var(--p-guilherme)"></div></div>
+      </div>
+      <div class="tile" style="--tile-accent:var(--areia)">
+        <div class="k">Progresso do cronograma</div>
+        <div class="ring-row" style="margin-top:8px;">
+          <div id="progress-ring"></div>
+          <div class="sub" id="stat-done">—</div>
+        </div>
+      </div>
+      <div class="tile" style="--tile-accent:var(--p-jamille)">
+        <div class="v" id="stat-days">—</div>
+        <div class="k" style="margin-top:2px;">Dias até a live</div>
+        <div class="sub">início 06/09 → live 20/10</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Desempenho por pessoa</h2><span class="hint">% de tarefas concluídas do que está sob responsabilidade de cada um</span></div>
+    <div class="perf-grid" id="perf"></div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Evolução</h2><span class="hint">histórico diário registrado a partir de hoje</span></div>
+    <div class="trend-grid">
+      <div class="trend-card">
+        <div class="trend-head"><span class="t">Faturamento</span><span class="v" id="trend-revenue-value">—</span></div>
+        <svg class="trend-svg" id="trend-revenue" hidden></svg>
+        <div class="trend-empty" id="trend-revenue-empty">Ainda sem histórico suficiente — volte depois de dois dias de dados.</div>
+      </div>
+      <div class="trend-card">
+        <div class="trend-head"><span class="t">Pessoas no grupo</span><span class="v" id="trend-group-value">—</span></div>
+        <svg class="trend-svg" id="trend-group" hidden></svg>
+        <div class="trend-empty" id="trend-group-empty">Ainda sem histórico suficiente — volte depois de dois dias de dados.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Preocupações</h2><span class="hint">calculado a partir do quadro de tarefas</span></div>
+    <div class="risk-grid" id="risks"></div>
+    <div class="note-card">
+      <b>Duas notas estratégicas fixas:</b> a verba de tráfego desse ciclo (R$5.000 para ~4 semanas) é enxuta pra meta de R$1-3MM — o grupo provavelmente vai crescer mais por conteúdo orgânico e base própria do que por anúncio pago, então vale acompanhar o custo por lead nas primeiras campanhas antes de prometer os 200. E o VSL da Página de Vendas (Fase 4) é o ponto certo pra fazer a quebra de objeção — filtrar quem não tem perfil antes da oferta, não só vender.
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Linha do tempo</h2><span class="hint">06/09 → 20/10</span></div>
+    <div class="timeline">
+      <div class="tl-track" id="tl-track"></div>
+      <div class="tl-labels"><span>06 set</span><span>20 out — live</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Materiais criativos</h2><span class="hint">criativos, artes e vídeos do Guilherme — upload direto ou link</span></div>
+    <div class="creative-grid" id="creatives"></div>
+    <form class="creative-form" id="creative-form">
+      <div class="field" style="min-width:200px;">
+        <label>Título</label>
+        <input type="text" id="creative-title" required placeholder="Ex: Anúncio 3 — carrossel">
+      </div>
+      <div class="field">
+        <label>Fase</label>
+        <select id="creative-phase"></select>
+      </div>
+      <div class="field" style="flex:0;">
+        <label>Tipo</label>
+        <div class="kind-toggle">
+          <button type="button" data-kind="upload" aria-pressed="true">Arquivo</button>
+          <button type="button" data-kind="link" aria-pressed="false">Link</button>
+        </div>
+      </div>
+      <div class="field" id="creative-file-field">
+        <label>Arquivo</label>
+        <input type="file" id="creative-file">
+      </div>
+      <div class="field" id="creative-url-field" hidden>
+        <label>Link</label>
+        <input type="url" id="creative-url" placeholder="https://drive.google.com/…">
+      </div>
+      <button type="submit" class="btn-primary" id="creative-submit">Adicionar</button>
+      <span class="upload-progress" id="creative-progress"></span>
+    </form>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Observações</h2><span class="hint">como estamos encaminhando — mural do time</span></div>
+    <div class="notes-feed" id="notes"></div>
+    <form class="note-form" id="note-form">
+      <textarea id="note-body" placeholder="Registre um andamento, um risco, uma decisão…" required></textarea>
+      <button type="submit" class="btn-primary" id="note-submit">Publicar</button>
+    </form>
+  </section>
+
+  <section>
+    <div class="section-head"><h2>Quadro de tarefas</h2></div>
+    <div class="filters" id="filters">
+      <span class="flabel">Ver tarefas de</span>
+      <button class="chip-filter" data-owner="Todos" aria-pressed="true">Todos</button>
+      <button class="chip-filter" data-owner="Michael" aria-pressed="false">Michael</button>
+      <button class="chip-filter" data-owner="Jamille" aria-pressed="false">Jamille</button>
+      <button class="chip-filter" data-owner="Guilherme" aria-pressed="false">Guilherme</button>
+    </div>
+    <div id="phases"><div class="loading">Carregando tarefas…</div></div>
+  </section>
+
+  <p class="foot-note">
+    <b>Como usar:</b> seu nome aparece automaticamente a partir do login — é o que fica registrado como "concluído por" e como autor das observações.
+    As datas de cada tarefa foram distribuídas dentro do prazo até a live (20/10) a partir da lista de fases do Guilherme; ajuste direto marcando/desmarcando — tudo aqui atualiza pra todo mundo, em tempo real.
+  </p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/supabase-client.js"></script>
+<script src="js/format.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/tasks.js"></script>
+<script src="js/metrics.js"></script>
+<script src="js/creatives.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
