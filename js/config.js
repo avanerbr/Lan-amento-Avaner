@@ -11,8 +11,8 @@ window.AVANER_CONFIG = {
   //    (crie um projeto NOVO e dedicado, separado do Código Vermelho e do
   //    CRM — é o que evita o problema de conexão que vocês já tiveram).
   // -----------------------------------------------------------------------
-  SUPABASE_URL: 'https://SEU-PROJETO.supabase.co',
-  SUPABASE_ANON_KEY: 'SUA-CHAVE-ANON-AQUI',
+  SUPABASE_URL: 'https://lnhfvkkgqvuhjqoxcgjz.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_xoOSKs3Ch5t5Rt311VMW7Q_xHAD_acA',
 
   // -----------------------------------------------------------------------
   // 2) Datas do lançamento
@@ -37,8 +37,6 @@ window.AVANER_CONFIG = {
   //    da marca — troque só os e-mails e nomes).
   // -----------------------------------------------------------------------
   TEAM: [
-    { email: 'michael@avaner.com.br',   name: 'Michael',   role: 'Fundador',                slot: 'michael' },
-    { email: 'jamille@avaner.com.br',   name: 'Jamille',   role: 'Customer Success',         slot: 'jamille' },
-    { email: 'guilherme@avaner.com.br', name: 'Guilherme', role: 'Coprodutor de Marketing',  slot: 'guilherme' },
+    { email: 'avanerbr@gmail.com',   name: 'Michael',   role: 'Fundador',                slot: 'avaner' },
   ],
 };
