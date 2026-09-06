@@ -13,13 +13,14 @@
   <div class="login-card">
     <img src="assets/avaner-icon.png" alt="Avaner">
     <h1>Painel de Lançamento</h1>
-    <div class="tagline">Consórcio HS · Coprodução Guilherme Assis</div>
+    <div class="tagline">Coprodução Guilherme Assis</div>
 
-    <form id="login-form">
-      <div>
-        <label for="login-email">E-mail</label>
-        <input type="email" id="login-email" required autocomplete="username" placeholder="seu@avaner.com.br">
-      </div>
+    <div id="login-picker" class="login-picker"></div>
+
+    <form id="login-form" hidden>
+      <button type="button" id="login-back" class="login-back">← trocar pessoa</button>
+      <div class="login-selected" id="login-selected"></div>
+      <input type="hidden" id="login-email">
       <div>
         <label for="login-password">Senha</label>
         <input type="password" id="login-password" required autocomplete="current-password" placeholder="••••••••">

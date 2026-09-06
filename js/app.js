@@ -1,6 +1,6 @@
 // =========================================================================
 // app.js — bootstrap do painel. Amarra os módulos (tasks, metrics,
-// creatives, notes, charts) à página e ao Supabase Realtime.
+// creatives, notes, requests, charts) à página e ao Supabase Realtime.
 // =========================================================================
 
 (async function () {
@@ -10,6 +10,7 @@
   const M = window.AvanerMetrics;
   const C = window.AvanerCreatives;
   const N = window.AvanerNotes;
+  const R = window.AvanerRequests;
   const Charts = window.AvanerCharts;
 
   const member = await window.requireSession();
@@ -36,18 +37,62 @@
   updateCountdown();
   setInterval(updateCountdown, 60 * 60 * 1000);
 
+  // ---- navegação por páginas ----------------------------------------------
+  document.querySelectorAll('.page-tab').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const page = btn.dataset.page;
+      document.querySelectorAll('.page-tab').forEach((b) => b.classList.toggle('active', b === btn));
+      document.querySelectorAll('.page').forEach((p) => (p.hidden = p.dataset.page !== page));
+      try {
+        localStorage.setItem('avanerActivePage', page);
+      } catch (e) {}
+    });
+  });
+  try {
+    const savedPage = localStorage.getItem('avanerActivePage');
+    if (savedPage) {
+      const btn = document.querySelector(`.page-tab[data-page="${savedPage}"]`);
+      if (btn) btn.click();
+    }
+  } catch (e) {}
+
   // ---- metas estáticas (rótulos vêm do config.js) ------------------------
   document.getElementById('revenue-sub').textContent = `meta ${F.fmtMoney(cfg.GOAL_REVENUE_MIN)}–${F.fmtMoney(cfg.GOAL_REVENUE_MAX)} na live`;
   document.getElementById('group-sub').textContent = `meta ${cfg.GOAL_GROUP_COUNT} até ${F.fmtDate(cfg.GOAL_GROUP_DATE)}`;
 
-  // ---- filtros de responsável --------------------------------------------
+  // ---- filtro de responsável (dentro da página Tarefas) -------------------
   document.querySelectorAll('.chip-filter').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.chip-filter').forEach((b) => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
       T.setOwnerFilter(btn.dataset.owner);
-      T.renderPhases(document.getElementById('phases'), T.all);
+      renderPhasePanel();
     });
   });
+
+  function renderPhasePanel() {
+    T.renderPhasePanel(document.getElementById('phase-panel'), T.all, onToggleTask);
+  }
+
+  function renderPhaseTabsAndPanel(tasks) {
+    T.renderPhaseTabs(document.getElementById('phase-tabs'), tasks, () => {
+      renderPhasePanel();
+    });
+    renderPhasePanel();
+  }
+
+  // Marcar/desmarcar aparece na hora (otimista): muda o estado local e
+  // re-renderiza tudo antes mesmo da resposta do banco voltar.
+  async function onToggleTask(id, checked) {
+    T.toggleLocal(T.all, id, checked);
+    renderTasksUI(T.all);
+    const ok = await T.persistToggle(id, checked);
+    if (!ok) {
+      // reverte se a gravação falhar
+      T.toggleLocal(T.all, id, !checked);
+      renderTasksUI(T.all);
+      alert('Não foi possível salvar — tente de novo.');
+    }
+  }
 
   // ---- render geral a partir das tarefas ---------------------------------
   function renderTasksUI(tasks) {
@@ -62,7 +107,7 @@
     T.renderPerf(document.getElementById('perf'), tasks);
     T.renderRisks(document.getElementById('risks'), tasks);
     T.renderTimeline(document.getElementById('tl-track'), tasks);
-    T.renderPhases(document.getElementById('phases'), tasks);
+    renderPhaseTabsAndPanel(tasks);
   }
 
   async function loadTasks() {
@@ -206,6 +251,42 @@
     }
   });
 
+  // ---- pedidos ----------------------------------------------------------
+  const requestToSelect = document.getElementById('request-to');
+  requestToSelect.innerHTML =
+    (cfg.TEAM || []).map((m) => `<option value="${m.name}">${m.name}</option>`).join('') + '<option value="Todos">Todos</option>';
+
+  async function loadRequests() {
+    const items = await R.fetchAll();
+    R.render(document.getElementById('requests-open'), document.getElementById('requests-done'), items, member.name);
+
+    const openForMe = R.countOpenFor(items, member.name);
+    const badge = document.getElementById('req-badge');
+    const badgeInline = document.getElementById('req-badge-inline');
+    badge.hidden = openForMe === 0;
+    badge.textContent = openForMe;
+    badgeInline.hidden = openForMe === 0;
+    badgeInline.textContent = openForMe;
+  }
+
+  document.getElementById('request-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = document.getElementById('request-body').value.trim();
+    const toName = requestToSelect.value;
+    if (!body) return;
+    const btn = document.getElementById('request-submit');
+    btn.disabled = true;
+    try {
+      await R.add({ fromName: member.name, toName, body });
+      document.getElementById('request-body').value = '';
+      await loadRequests();
+    } catch (err) {
+      alert('Não foi possível enviar: ' + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
   // ---- realtime -------------------------------------------------------------
   const sb = window.supabaseClient;
   sb.channel('tasks-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, loadTasks).subscribe();
@@ -213,7 +294,8 @@
   sb.channel('metrics-history-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'metrics_history' }, loadHistory).subscribe();
   sb.channel('creative-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'creative_assets' }, loadCreatives).subscribe();
   sb.channel('notes-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, loadNotes).subscribe();
+  sb.channel('requests-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, loadRequests).subscribe();
 
   // ---- carga inicial ----------------------------------------------------------
-  await Promise.all([loadTasks(), loadMetrics(), loadHistory(), loadCreatives(), loadNotes()]);
+  await Promise.all([loadTasks(), loadMetrics(), loadHistory(), loadCreatives(), loadNotes(), loadRequests()]);
 })();

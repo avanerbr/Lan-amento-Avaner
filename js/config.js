@@ -30,13 +30,17 @@ window.AVANER_CONFIG = {
   GOAL_GROUP_DATE: '2026-10-12',
 
   // -----------------------------------------------------------------------
-  // 4) Time — o e-mail é o mesmo que a pessoa usa pra logar (criado em
-  //    Authentication → Users no Supabase). O "slot" define a cor de
-  //    identidade dela nos gráficos (não mude os slots, são as 3 únicas
-  //    cores validadas para contraste e daltonismo sobre o azul-marinho
-  //    da marca — troque só os e-mails e nomes).
+  // 4) Time — aparece como opções de login (em vez de digitar e-mail). O
+  //    e-mail é o mesmo cadastrado em Authentication → Users no Supabase.
+  //    O "slot" define a cor de identidade da pessoa nos gráficos — use
+  //    só 'michael', 'jamille' ou 'guilherme' (são as 3 únicas cores
+  //    validadas para contraste e daltonismo sobre o azul-marinho da
+  //    marca; qualquer outro valor cai numa cor cinza neutra).
+  //    Adicione as linhas da Jamille e do Guilherme aqui assim que criar
+  //    os usuários deles no Supabase, pra eles aparecerem na tela de
+  //    login também.
   // -----------------------------------------------------------------------
   TEAM: [
-    { email: 'avanerbr@gmail.com',   name: 'Michael',   role: 'Fundador',                slot: 'avaner' },
+    { email: 'avanerbr@gmail.com', name: 'Michael', role: 'Fundador', slot: 'michael' },
   ],
 };

@@ -65,6 +65,18 @@ create table if not exists public.notes (
   created_at  timestamptz not null default now()
 );
 
+-- Pedidos — um pede algo pro outro e o sistema aponta pra quem precisa agir
+create table if not exists public.requests (
+  id           uuid primary key default gen_random_uuid(),
+  from_name    text not null,
+  to_name      text not null,        -- nome de uma pessoa do TEAM, ou 'Todos'
+  body         text not null,
+  resolved     boolean not null default false,
+  resolved_by  text,
+  created_at   timestamptz not null default now(),
+  resolved_at  timestamptz
+);
+
 -- -------------------------------------------------------------------------
 -- 2. ROW LEVEL SECURITY
 -- Ferramenta interna de 3 pessoas: qualquer usuário autenticado (Michael,
@@ -76,6 +88,7 @@ alter table public.metrics          enable row level security;
 alter table public.metrics_history  enable row level security;
 alter table public.creative_assets  enable row level security;
 alter table public.notes            enable row level security;
+alter table public.requests         enable row level security;
 
 do $$ begin
   create policy "tasks_all_authenticated" on public.tasks
@@ -102,6 +115,11 @@ do $$ begin
     for all to authenticated using (true) with check (true);
 exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create policy "requests_all_authenticated" on public.requests
+    for all to authenticated using (true) with check (true);
+exception when duplicate_object then null; end $$;
+
 -- -------------------------------------------------------------------------
 -- 3. REALTIME
 -- Faz o painel atualizar sozinho, na hora, pra todo mundo (sem dar F5).
@@ -125,6 +143,10 @@ exception when duplicate_object then null; end $$;
 
 do $$ begin
   alter publication supabase_realtime add table public.notes;
+exception when duplicate_object then null; end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.requests;
 exception when duplicate_object then null; end $$;
 
 -- -------------------------------------------------------------------------

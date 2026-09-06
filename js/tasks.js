@@ -1,5 +1,6 @@
 // =========================================================================
-// Quadro de tarefas — fases, desempenho por pessoa, preocupações, timeline.
+// Quadro de tarefas — fases em abas, desempenho por pessoa, preocupações
+// (incluindo o critério de "pronto para anúncios"), timeline.
 // =========================================================================
 
 window.AvanerTasks = (function () {
@@ -13,8 +14,16 @@ window.AvanerTasks = (function () {
     'Fase 5: Pós-Lançamento',
   ];
 
+  // Critério de prontidão: pra começar a fase X, a fase anterior listada
+  // aqui precisa estar 100% concluída. Só a Fase 2 (Campanhas/anúncios)
+  // tem critério por enquanto — é o "quando posso começar a rodar anúncio".
+  const READINESS_GATES = {
+    'Fase 2: Campanhas': 'Fase 1: Alicerce',
+  };
+
   let allTasks = [];
   let ownerFilter = 'Todos';
+  let activePhase = null;
   let currentMember = null;
   let startDate, liveDate;
 
@@ -41,13 +50,26 @@ window.AvanerTasks = (function () {
     return data.map(rowToTask);
   }
 
-  async function toggleTask(id, nowDone) {
-    const doneBy = nowDone ? (currentMember ? currentMember.name : 'Alguém') : null;
+  // Muda o estado local na hora (otimista) — quem chamou é responsável por
+  // re-renderizar a UI logo em seguida, antes mesmo da gravação no banco
+  // confirmar, pra parecer instantâneo.
+  function toggleLocal(tasks, id, checked) {
+    const t = tasks.find((x) => x.id === id);
+    if (t) {
+      t.done = checked;
+      t.doneBy = checked ? (currentMember ? currentMember.name : 'Alguém') : null;
+    }
+    return tasks;
+  }
+
+  async function persistToggle(id, checked) {
+    const doneBy = checked ? (currentMember ? currentMember.name : 'Alguém') : null;
     const { error } = await window.supabaseClient
       .from('tasks')
-      .update({ done: nowDone, done_by: doneBy, updated_at: new Date().toISOString() })
+      .update({ done: checked, done_by: doneBy, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) console.error('[Avaner] erro ao atualizar tarefa', error);
+    return !error;
   }
 
   function getCurrentPhase(tasks) {
@@ -62,6 +84,15 @@ window.AvanerTasks = (function () {
       if (!current && todayIso <= dates[dates.length - 1]) current = p;
     });
     return current || PHASE_ORDER[PHASE_ORDER.length - 1];
+  }
+
+  function computeAdsReadiness(tasks) {
+    const gatePhase = READINESS_GATES['Fase 2: Campanhas'];
+    const gateTasks = tasks.filter((t) => t.phase === gatePhase);
+    const done = gateTasks.filter((t) => t.done).length;
+    const total = gateTasks.length;
+    const missing = gateTasks.filter((t) => !t.done).map((t) => t.title);
+    return { ready: total > 0 && done === total, done, total, missing, gatePhase };
   }
 
   function computeRisks(tasks) {
@@ -99,7 +130,16 @@ window.AvanerTasks = (function () {
       text: `<b>${currentPhase.replace(/^Fase \d: /, '')}</b> — ${phaseDone}/${phaseTasks.length} tarefas (${phasePct}%).`,
     };
 
-    return [pace, overdueCard, phaseCard];
+    const readiness = computeAdsReadiness(tasks);
+    const readinessCard = readiness.ready
+      ? { icon: 'good', title: 'Pronto para anúncios', text: `<b>${readiness.gatePhase.replace(/^Fase \d: /, '')}</b> 100% concluída — pode subir as campanhas da Fase 2.` }
+      : {
+          icon: readiness.done / (readiness.total || 1) >= 0.7 ? 'warn' : 'serious',
+          title: 'Pronto para anúncios',
+          text: `Ainda não — <b>${readiness.done}/${readiness.total}</b> da ${readiness.gatePhase.replace(/^Fase \d: /, '')} concluída${readiness.missing.length ? '. Falta: ' + readiness.missing.slice(0, 2).join('; ') + (readiness.missing.length > 2 ? '…' : '') : ''}.`,
+        };
+
+    return [pace, overdueCard, phaseCard, readinessCard];
   }
 
   function renderRisks(container, tasks) {
@@ -119,7 +159,7 @@ window.AvanerTasks = (function () {
     const byPhase = {};
     tasks.forEach((t) => (byPhase[t.phase] = byPhase[t.phase] || []).push(t));
     const totalSpan = liveDate - startDate;
-    const segColors = ['var(--navy)', 'var(--p-guilherme)', 'var(--p-jamille)', 'var(--p-michael)', 'var(--p-team)'];
+    const segColors = ['var(--areia)', 'var(--p-guilherme)', 'var(--p-jamille)', 'var(--p-michael)', 'var(--p-team)'];
     let html = '';
     PHASE_ORDER.forEach((p, i) => {
       const arr = byPhase[p];
@@ -168,44 +208,86 @@ window.AvanerTasks = (function () {
       .join('');
   }
 
-  function renderPhases(container, tasks) {
-    if (!tasks.length) {
-      container.innerHTML = '<div class="loading">Nenhuma tarefa ainda.</div>';
-      return;
-    }
+  function setActivePhase(p) {
+    activePhase = p;
+  }
+  function getActivePhase() {
+    return activePhase;
+  }
+  function setOwnerFilter(f) {
+    ownerFilter = f;
+  }
+  function getOwnerFilter() {
+    return ownerFilter;
+  }
+
+  function renderPhaseTabs(container, tasks, onSelect) {
     const byPhase = {};
     tasks.forEach((t) => (byPhase[t.phase] = byPhase[t.phase] || []).push(t));
-    const currentPhase = getCurrentPhase(tasks);
+    if (!activePhase) activePhase = getCurrentPhase(tasks);
 
     container.innerHTML = PHASE_ORDER.filter((p) => byPhase[p])
       .map((p, idx) => {
-        const arr = byPhase[p].slice().sort((a, b) => a.dueDate.localeCompare(b.dueDate) || (a.order || 0) - (b.order || 0));
-        const visible = ownerFilter === 'Todos' ? arr : arr.filter((t) => F.taskInvolves(t, ownerFilter));
-        if (!visible.length) return '';
-        const pdone = arr.filter((t) => t.done).length;
-        const dates = arr.map((t) => t.dueDate).sort();
-        const range = F.fmtDate(dates[0]) + '–' + F.fmtDate(dates[dates.length - 1]);
-        const openAttr = p === currentPhase ? 'open' : '';
-        return `<details class="phase" ${openAttr}>
-        <summary>
-          <div class="phase-title">
-            <span class="phase-num">${idx + 1}</span>
-            <div><h2>${p.replace(/^Fase \d: /, '')}</h2><div class="phase-range">${range}</div></div>
-          </div>
-          <div class="phase-meta">
-            <div class="phase-progress">
-              <div class="phase-frac">${pdone}/${arr.length}</div>
-              <div class="bar-track"><div class="bar-fill" style="width:${arr.length ? (pdone / arr.length) * 100 : 0}%;background:var(--areia)"></div></div>
-            </div>
-            <svg class="chev" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-        </summary>
-        <div class="task-list">
-          ${visible
-            .map((t) => {
-              const state = F.dueState(t.dueDate, t.done);
-              const chipBg = F.ownerChipBackground(t.owner);
-              return `<div class="task ${t.done ? 'done' : ''}">
+        const arr = byPhase[p];
+        const done = arr.filter((t) => t.done).length;
+        const pct = arr.length ? (done / arr.length) * 100 : 0;
+        const active = p === activePhase;
+        return `<button type="button" class="phase-tab ${active ? 'active' : ''}" data-phase="${p}">
+          <span class="phase-tab-num">${idx + 1}</span>
+          <span class="phase-tab-body">
+            <span class="phase-tab-name">${p.replace(/^Fase \d: /, '')}</span>
+            <span class="phase-tab-frac">${done}/${arr.length}</span>
+            <span class="phase-tab-bar"><span style="width:${pct}%"></span></span>
+          </span>
+        </button>`;
+      })
+      .join('');
+
+    container.querySelectorAll('.phase-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activePhase = btn.dataset.phase;
+        onSelect(activePhase);
+      });
+    });
+  }
+
+  function renderPhasePanel(container, tasks, onToggle) {
+    if (!activePhase) activePhase = getCurrentPhase(tasks);
+    const arr = tasks.filter((t) => t.phase === activePhase).sort((a, b) => a.dueDate.localeCompare(b.dueDate) || (a.order || 0) - (b.order || 0));
+    const visible = ownerFilter === 'Todos' ? arr : arr.filter((t) => F.taskInvolves(t, ownerFilter));
+    const done = arr.filter((t) => t.done).length;
+    const dates = arr.map((t) => t.dueDate).sort();
+    const range = arr.length ? F.fmtDate(dates[0]) + '–' + F.fmtDate(dates[dates.length - 1]) : '';
+
+    const readiness = READINESS_GATES[activePhase] ? computeAdsReadiness(tasks) : null;
+
+    container.innerHTML = `
+      <div class="phase-panel-head">
+        <div>
+          <h2>${activePhase.replace(/^Fase \d: /, '')}</h2>
+          <div class="phase-range">${range} · ${done}/${arr.length} concluídas</div>
+        </div>
+        <div class="bar-track" style="width:160px;"><div class="bar-fill" style="width:${arr.length ? (done / arr.length) * 100 : 0}%;background:var(--areia)"></div></div>
+      </div>
+      ${
+        readiness
+          ? `<div class="readiness-banner ${readiness.ready ? 'ready' : 'not-ready'}">
+              ${readiness.ready ? '✅' : '⏳'}
+              <div>
+                <b>${readiness.ready ? 'Pronto para começar os anúncios' : 'Ainda não é hora de subir os anúncios'}</b>
+                <span>Critério: ${readiness.gatePhase.replace(/^Fase \d: /, '')} 100% concluída (${readiness.done}/${readiness.total})${!readiness.ready && readiness.missing.length ? ' — falta: ' + readiness.missing.join('; ') : ''}.</span>
+              </div>
+            </div>`
+          : ''
+      }
+      <div class="task-list">
+        ${
+          visible.length
+            ? visible
+                .map((t) => {
+                  const state = F.dueState(t.dueDate, t.done);
+                  const chipBg = F.ownerChipBackground(t.owner);
+                  return `<div class="task ${t.done ? 'done' : ''}">
               <input type="checkbox" class="cb" data-id="${t.id}" ${t.done ? 'checked' : ''}>
               <div class="task-body">
                 <div class="task-title">${t.title}</div>
@@ -217,24 +299,19 @@ window.AvanerTasks = (function () {
                 </div>
               </div>
             </div>`;
-            })
-            .join('')}
-        </div>
-      </details>`;
-      })
-      .join('');
+                })
+                .join('')
+            : '<div class="loading">Nenhuma tarefa dessa pessoa nesta fase.</div>'
+        }
+      </div>`;
 
     container.querySelectorAll('.cb').forEach((cb) => {
-      cb.addEventListener('change', async () => {
-        cb.disabled = true;
-        await toggleTask(cb.dataset.id, cb.checked);
-        cb.disabled = false;
+      cb.addEventListener('change', () => {
+        const row = cb.closest('.task');
+        row.classList.add('pulse');
+        onToggle(cb.dataset.id, cb.checked);
       });
     });
-  }
-
-  function setOwnerFilter(f) {
-    ownerFilter = f;
   }
 
   function init(opts) {
@@ -246,12 +323,19 @@ window.AvanerTasks = (function () {
   return {
     PHASE_ORDER,
     fetchAll,
-    renderPhases,
+    toggleLocal,
+    persistToggle,
+    renderPhaseTabs,
+    renderPhasePanel,
     renderPerf,
     renderRisks,
     renderTimeline,
     getCurrentPhase,
+    computeAdsReadiness,
     setOwnerFilter,
+    getOwnerFilter,
+    setActivePhase,
+    getActivePhase,
     init,
     get all() {
       return allTasks;
